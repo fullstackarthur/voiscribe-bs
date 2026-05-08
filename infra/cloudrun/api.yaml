@@ -1,0 +1,49 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: meetingbot-api
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "10"
+        run.googleapis.com/cpu-throttling: "false"
+    spec:
+      serviceAccountName: meetingbot-api@PROJECT_ID.iam.gserviceaccount.com
+      containers:
+        - image: REGION-docker.pkg.dev/PROJECT_ID/meetingbot/api:latest
+          ports:
+            - containerPort: 3000
+          resources:
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: LOG_LEVEL
+              value: info
+            - name: CLOUD_TASKS_PROJECT
+              value: "PROJECT_ID"
+            - name: CLOUD_TASKS_LOCATION
+              value: "us-central1"
+            - name: CLOUD_TASKS_QUEUE
+              value: "meeting-jobs"
+            - name: WORKER_BASE_URL
+              value: "https://meetingbot-worker-HASH-uc.a.run.app"
+            - name: SERVICE_ACCOUNT_EMAIL
+              value: "meetingbot-worker@PROJECT_ID.iam.gserviceaccount.com"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: meetingbot-database-url
+                  key: latest
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 30
