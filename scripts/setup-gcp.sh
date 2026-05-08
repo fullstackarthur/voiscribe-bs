@@ -270,17 +270,27 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$REPO_ROOT"
 
 info "  Submitting API image to Cloud Build (~2 min)..."
+cat > /tmp/cloudbuild-api.yaml << EOF
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '--platform', 'linux/amd64', '-f', 'apps/api/Dockerfile', '-t', '${REGISTRY}/api:latest', '.']
+images: ['${REGISTRY}/api:latest']
+EOF
 gcloud builds submit . \
-  --tag="${REGISTRY}/api:latest" \
-  --dockerfile="apps/api/Dockerfile" \
+  --config=/tmp/cloudbuild-api.yaml \
   --project="$PROJECT_ID" \
   --quiet
 success "  API image built and pushed"
 
 info "  Submitting Worker image to Cloud Build (includes Chromium — ~8 min)..."
+cat > /tmp/cloudbuild-worker.yaml << EOF
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '--platform', 'linux/amd64', '-f', 'apps/worker/Dockerfile', '-t', '${REGISTRY}/worker:latest', '.']
+images: ['${REGISTRY}/worker:latest']
+EOF
 gcloud builds submit . \
-  --tag="${REGISTRY}/worker:latest" \
-  --dockerfile="apps/worker/Dockerfile" \
+  --config=/tmp/cloudbuild-worker.yaml \
   --project="$PROJECT_ID" \
   --quiet
 success "  Worker image built and pushed"
