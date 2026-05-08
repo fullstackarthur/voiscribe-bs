@@ -18,7 +18,6 @@ export async function launchAndJoinMeet(
   const logger = createLogger({ meetingId });
 
   const authStatePath = `/tmp/auth-state-${meetingId}.json`;
-  fs.writeFileSync(authStatePath, googleAuthStateJson);
 
   logger.info({ event: "BROWSER_LAUNCHING" }, "Launching Chromium");
 
@@ -39,8 +38,12 @@ export async function launchAndJoinMeet(
     }
   );
 
-  await context.setStorageState(authStatePath);
-  fs.unlinkSync(authStatePath);
+  fs.writeFileSync(authStatePath, googleAuthStateJson);
+  try {
+    await context.setStorageState(authStatePath);
+  } finally {
+    fs.rmSync(authStatePath, { force: true });
+  }
 
   const page = await context.newPage();
 

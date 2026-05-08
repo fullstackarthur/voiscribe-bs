@@ -26,6 +26,15 @@ export const workerPlugin: FastifyPluginAsync = async (fastify) => {
       return reply.status(404).send({ error: "Meeting not found" });
     }
 
+    if (meeting.status !== "SCHEDULED") {
+      const log = logger.child({ meetingId });
+      log.warn(
+        { event: "DUPLICATE_TRIGGER", meetingId, status: meeting.status },
+        "Meeting already processed, skipping duplicate delivery"
+      );
+      return reply.status(200).send({ status: "skipped", meetingId });
+    }
+
     const log = logger.child({ meetingId });
     log.info({ event: "WORKER_TRIGGERED" }, "Worker triggered for meeting");
 

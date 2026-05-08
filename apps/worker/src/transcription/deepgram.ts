@@ -35,8 +35,19 @@ export function startDeepgramTranscription(
     language: "en",
   });
 
+  // Buffer audio and send in fixed-size chunks
+  const MAX_BUFFER_BYTES = 512 * 1024; // 512 KB
+  let buffer = Buffer.alloc(0);
+
   connection.on(LiveTranscriptionEvents.Open, () => {
-    logger.info({ event: "DEEPGRAM_CONNECTED" }, "Deepgram WebSocket open");
+    logger.info({ event: "DEEPGRAM_CONNECTED" }, "Deepgram WebSocket opened");
+    // drain any pre-buffered audio
+    if (buffer.length > 0) {
+      const slice = buffer.subarray(0, buffer.length);
+      const ab = slice.buffer.slice(slice.byteOffset, slice.byteOffset + slice.byteLength) as ArrayBuffer;
+      connection.send(ab);
+      buffer = Buffer.alloc(0);
+    }
   });
 
   connection.on(LiveTranscriptionEvents.Transcript, async (data) => {
@@ -68,11 +79,11 @@ export function startDeepgramTranscription(
     logger.info({ event: "DEEPGRAM_CLOSED" }, "Deepgram WebSocket closed");
   });
 
-  // Buffer audio and send in fixed-size chunks
-  let buffer = Buffer.alloc(0);
-
   audioStream.on("data", (incoming: Buffer) => {
     buffer = Buffer.concat([buffer, incoming]);
+    if (buffer.length > MAX_BUFFER_BYTES) {
+      buffer = buffer.subarray(buffer.length - MAX_BUFFER_BYTES);
+    }
 
     while (buffer.length >= CHUNK_BYTES) {
       const slice = buffer.subarray(0, CHUNK_BYTES);

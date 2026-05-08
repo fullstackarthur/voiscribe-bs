@@ -32,6 +32,7 @@ export async function runMeetingSession(meeting: Meeting): Promise<void> {
   let joinResult: JoinResult | undefined;
   let audioPipeline: AudioPipeline | undefined;
   let deepgramSession: DeepgramSession | undefined;
+  let sessionFailed = false;
 
   try {
     joinResult = await launchAndJoinMeet(
@@ -62,6 +63,7 @@ export async function runMeetingSession(meeting: Meeting): Promise<void> {
 
     logger.info({ event: "MEETING_ENDED" }, "Meeting ended — beginning cleanup");
   } catch (err) {
+    sessionFailed = true;
     logger.error({ event: "SESSION_ERROR", err }, "Meeting session failed");
 
     await db.meeting
@@ -77,12 +79,14 @@ export async function runMeetingSession(meeting: Meeting): Promise<void> {
       await cleanupBrowser(joinResult.context, meeting.id);
     }
 
-    await db.meeting
-      .update({
-        where: { id: meeting.id },
-        data: { status: "ENDED", endedAt: new Date() },
-      })
-      .catch(() => {});
+    if (!sessionFailed) {
+      await db.meeting
+        .update({
+          where: { id: meeting.id },
+          data: { status: "ENDED", endedAt: new Date() },
+        })
+        .catch(() => {});
+    }
 
     logger.info({ event: "SESSION_CLEANUP_COMPLETE" }, "Session cleanup complete");
   }
