@@ -4,6 +4,7 @@ RUN npm install -g pnpm
 WORKDIR /app
 
 COPY pnpm-workspace.yaml ./
+COPY pnpm-lock.yaml ./
 COPY package.json ./
 COPY tsconfig.base.json ./
 COPY prisma/ ./prisma/
