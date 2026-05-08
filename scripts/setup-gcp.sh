@@ -261,11 +261,14 @@ CLOUDBUILD_SA="${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
 COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 
 # Cloud Build SA: push images + read/write build source in GCS
-bind_role "serviceAccount:${CLOUDBUILD_SA}" "roles/artifactregistry.writer"
+bind_role "serviceAccount:${CLOUDBUILD_SA}" "roles/artifactregistry.admin"
 bind_role "serviceAccount:${CLOUDBUILD_SA}" "roles/storage.admin"
 
 # Compute SA: read build source from GCS (used internally by Cloud Build)
 bind_role "serviceAccount:${COMPUTE_SA}" "roles/storage.objectAdmin"
+
+info "Waiting 60s for IAM bindings to propagate before building..."
+sleep 60
 
 # Detect repo root (script lives in scripts/ subdir)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
