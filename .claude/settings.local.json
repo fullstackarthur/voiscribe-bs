@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install *)",
+      "Bash(cd C:\\\\\\\\Users\\\\\\\\kanth\\\\\\\\Documents\\\\\\\\GitHub\\\\\\\\voiscribe-bs\\\\\\\\.claude\\\\\\\\worktrees\\\\\\\\practical-wescoff-d13805)",
+      "Bash(cd /mnt/c/Users/kanth/Documents/GitHub/voiscribe-bs/.claude/worktrees/practical-wescoff-d13805 && pnpm install 2>&1)",
+      "Bash(pnpm help *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(pnpm --filter @meetingbot/logger test)",
+      "Bash(pnpm --filter @meetingbot/config test)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm build *)"
+    ]
+  }
+}
