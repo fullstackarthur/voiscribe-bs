@@ -1,6 +1,7 @@
 FROM node:22-slim AS base
 
 RUN apt-get update && apt-get install -y \
+    openssl \
     xvfb \
     pulseaudio \
     ffmpeg \
