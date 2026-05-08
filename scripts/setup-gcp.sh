@@ -323,7 +323,7 @@ PROXY_PID=$!
 sleep 3
 
 # Run migration
-MIGRATION_DB_URL="postgresql://${DB_USER}:${DB_PASSWORD}@127.0.0.1:5433/${DB_NAME}" \
+DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@127.0.0.1:5433/${DB_NAME}" \
   pnpm db:migrate
 
 # Stop proxy
