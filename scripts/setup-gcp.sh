@@ -249,8 +249,19 @@ fi
 
 success "Secrets created"
 
-# ─── Step 9: Build and push Docker images ────────────────────────────────────
-info "Building and pushing Docker images..."
+# ─── Step 9: Build and push Docker images via Cloud Build ────────────────────
+info "Building and pushing Docker images via Cloud Build (runs on GCP, no local Docker needed)..."
+
+# Enable Cloud Build API
+gcloud services enable cloudbuild.googleapis.com --quiet
+
+# Grant Cloud Build permission to push to Artifact Registry
+CLOUDBUILD_SA="$(gcloud projects describe "$PROJECT_ID" \
+  --format='value(projectNumber)')@cloudbuild.gserviceaccount.com"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${CLOUDBUILD_SA}" \
+  --role="roles/artifactregistry.writer" \
+  --quiet &>/dev/null
 
 # Detect repo root (script lives in scripts/ subdir)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -258,23 +269,21 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$REPO_ROOT"
 
-info "  Building API image..."
-docker build \
-  --platform linux/amd64 \
-  -t "${REGISTRY}/api:latest" \
-  -f apps/api/Dockerfile \
-  .
-docker push "${REGISTRY}/api:latest"
-success "  API image pushed"
+info "  Submitting API image to Cloud Build (~2 min)..."
+gcloud builds submit . \
+  --tag="${REGISTRY}/api:latest" \
+  --dockerfile="apps/api/Dockerfile" \
+  --project="$PROJECT_ID" \
+  --quiet
+success "  API image built and pushed"
 
-info "  Building Worker image (includes Chromium — takes ~5 min)..."
-docker build \
-  --platform linux/amd64 \
-  -t "${REGISTRY}/worker:latest" \
-  -f apps/worker/Dockerfile \
-  .
-docker push "${REGISTRY}/worker:latest"
-success "  Worker image pushed"
+info "  Submitting Worker image to Cloud Build (includes Chromium — ~8 min)..."
+gcloud builds submit . \
+  --tag="${REGISTRY}/worker:latest" \
+  --dockerfile="apps/worker/Dockerfile" \
+  --project="$PROJECT_ID" \
+  --quiet
+success "  Worker image built and pushed"
 
 # ─── Step 10: Prisma migration via Cloud SQL Auth Proxy ──────────────────────
 info "Running Prisma database migration..."
