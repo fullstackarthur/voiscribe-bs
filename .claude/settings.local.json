@@ -17,7 +17,12 @@
       "Bash(command -v psql)",
       "Bash(psql --version)",
       "Bash(pnpm --filter @meetingbot/api test)",
-      "Bash(pnpm --filter @meetingbot/api build)"
+      "Bash(pnpm --filter @meetingbot/api build)",
+      "Bash(pnpm --filter @meetingbot/worker test)",
+      "Bash(npx vitest *)",
+      "Bash(xargs grep -l \"worker\")",
+      "Bash(xargs grep -l \"from.*worker.*index\")",
+      "Bash(xargs -I {} sh -c 'echo \"=== {} ===\" && tail -5 {}')"
     ]
   }
 }

@@ -65,10 +65,4 @@ async function main() {
   }
 }
 
-// Only run main if this is the entry point, not when imported in tests
-if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
-  main().catch((err) => {
-    logger.error({ event: "MAIN_FAILED", err }, "Main function failed");
-    process.exit(1);
-  });
-}
+main();
