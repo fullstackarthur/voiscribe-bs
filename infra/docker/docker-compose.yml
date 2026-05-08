@@ -1,0 +1,58 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: meetingbot
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: meetingbot
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meetingbot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: "postgresql://meetingbot:secret@postgres:5432/meetingbot"
+      CLOUD_TASKS_PROJECT: "${CLOUD_TASKS_PROJECT}"
+      CLOUD_TASKS_LOCATION: "${CLOUD_TASKS_LOCATION}"
+      CLOUD_TASKS_QUEUE: "${CLOUD_TASKS_QUEUE}"
+      WORKER_BASE_URL: "${WORKER_BASE_URL}"
+      SERVICE_ACCOUNT_EMAIL: "${SERVICE_ACCOUNT_EMAIL}"
+      LOG_LEVEL: "debug"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: apps/worker/Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      DATABASE_URL: "postgresql://meetingbot:secret@postgres:5432/meetingbot"
+      DEEPGRAM_API_KEY: "${DEEPGRAM_API_KEY}"
+      GOOGLE_AUTH_STATE: "${GOOGLE_AUTH_STATE}"
+      PULSE_SINK_NAME: "virtual_sink"
+      LOG_LEVEL: "debug"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    cap_add:
+      - SYS_ADMIN
+    shm_size: "2gb"
+
+volumes:
+  postgres_data:
