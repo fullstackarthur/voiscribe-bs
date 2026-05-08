@@ -1,0 +1,56 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: meetingbot-worker
+  annotations:
+    run.googleapis.com/ingress: internal
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "100"
+        run.googleapis.com/cpu-throttling: "false"
+        run.googleapis.com/execution-environment: gen2
+    spec:
+      containerConcurrency: 1
+      timeoutSeconds: 1740
+      serviceAccountName: meetingbot-worker@PROJECT_ID.iam.gserviceaccount.com
+      containers:
+        - image: REGION-docker.pkg.dev/PROJECT_ID/meetingbot/worker:latest
+          ports:
+            - containerPort: 3001
+          resources:
+            limits:
+              cpu: "2"
+              memory: "4Gi"
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: LOG_LEVEL
+              value: info
+            - name: DISPLAY
+              value: ":99"
+            - name: PULSE_SINK_NAME
+              value: "virtual_sink"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: meetingbot-database-url
+                  key: latest
+            - name: DEEPGRAM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: meetingbot-deepgram-key
+                  key: latest
+            - name: GOOGLE_AUTH_STATE
+              valueFrom:
+                secretKeyRef:
+                  name: meetingbot-google-auth-state
+                  key: latest
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3001
+            initialDelaySeconds: 60
+            periodSeconds: 60

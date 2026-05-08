@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install *)",
+      "Bash(cd C:\\\\\\\\Users\\\\\\\\kanth\\\\\\\\Documents\\\\\\\\GitHub\\\\\\\\voiscribe-bs\\\\\\\\.claude\\\\\\\\worktrees\\\\\\\\practical-wescoff-d13805)",
+      "Bash(cd /mnt/c/Users/kanth/Documents/GitHub/voiscribe-bs/.claude/worktrees/practical-wescoff-d13805 && pnpm install 2>&1)",
+      "Bash(pnpm help *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(pnpm --filter @meetingbot/logger test)",
+      "Bash(pnpm --filter @meetingbot/config test)",
+      "Bash(pnpm test *)",
+      "Bash(pnpm build *)",
+      "Bash(pnpm --filter @meetingbot/config build)",
+      "Bash(docker info *)",
+      "Bash(docker context *)",
+      "Bash(command -v psql)",
+      "Bash(psql --version)",
+      "Bash(pnpm --filter @meetingbot/api test)",
+      "Bash(pnpm --filter @meetingbot/api build)",
+      "Bash(pnpm --filter @meetingbot/worker test)",
+      "Bash(npx vitest *)",
+      "Bash(xargs grep -l \"worker\")",
+      "Bash(xargs grep -l \"from.*worker.*index\")",
+      "Bash(xargs -I {} sh -c 'echo \"=== {} ===\" && tail -5 {}')"
+    ]
+  }
+}

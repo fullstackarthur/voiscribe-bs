@@ -1,0 +1,4 @@
+google-auth-state.json
+.env
+.env.local
+.env.*.local

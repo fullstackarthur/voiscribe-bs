@@ -1,0 +1,23 @@
+{
+  "name": "meetingbot-mvp",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "vitest run --workspace vitest.workspace.ts",
+    "test:watch": "vitest --workspace vitest.workspace.ts",
+    "db:generate": "prisma generate --schema=prisma/schema.prisma",
+    "db:migrate": "prisma migrate deploy --schema=prisma/schema.prisma",
+    "db:migrate:dev": "prisma migrate dev --schema=prisma/schema.prisma",
+    "setup:google-auth": "ts-node scripts/setup-google-auth.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "prisma": "^5.14.0",
+    "@prisma/client": "^5.14.0",
+    "@types/node": "^22.0.0",
+    "ts-node": "^10.9.0"
+  }
+}
