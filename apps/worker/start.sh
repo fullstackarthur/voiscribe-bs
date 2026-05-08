@@ -1,25 +1,31 @@
 #!/bin/bash
-# Audio and display setup is best-effort — Node must start regardless so
-# Cloud Run's health check passes. Audio errors surface at runtime per meeting.
+# Best-effort display and audio setup — Node must start regardless.
+# All setup commands are time-bounded so they cannot hang the container.
 
-# Virtual display — Chromium needs this even in "headless" mode via Playwright
+# Virtual display — Chromium needs a display even in Playwright mode
 Xvfb :99 -screen 0 1920x1080x24 &
-echo "Xvfb started on :99 (PID $!)"
+echo "Xvfb started (PID $!)"
 
-# PulseAudio — non-fatal, container may not have full audio device support
-pulseaudio --start --exit-idle-time=-1 --log-target=stderr 2>/dev/null || true
+# PulseAudio — give it 5s max to start, then move on regardless
+timeout 5 pulseaudio --start --exit-idle-time=-1 --log-target=stderr 2>/dev/null || true
 
-# Wait up to 10s for PulseAudio to be ready before loading the null sink
-for i in $(seq 1 10); do
-  if pactl info &>/dev/null; then
-    pactl load-module module-null-sink \
+# Wait up to 8s for PulseAudio socket to appear, then load null sink
+PULSE_READY=0
+for i in $(seq 1 8); do
+  if timeout 2 pactl info &>/dev/null 2>&1; then
+    timeout 3 pactl load-module module-null-sink \
       sink_name=virtual_sink \
       sink_properties=device.description="MeetingBotSink" 2>/dev/null || true
     echo "PulseAudio null sink 'virtual_sink' ready"
+    PULSE_READY=1
     break
   fi
   sleep 1
 done
+
+if [ "$PULSE_READY" -eq 0 ]; then
+  echo "PulseAudio not available — audio capture will fail at runtime, HTTP server starting anyway"
+fi
 
 export PULSE_SINK=virtual_sink
 export DISPLAY=:99
