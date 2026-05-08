@@ -173,8 +173,6 @@ else
     --storage-size=10GB \
     --storage-type=SSD \
     --no-backup \
-    --no-assign-ip \
-    --enable-google-private-path \
     --project="$PROJECT_ID" \
     --quiet
   success "Cloud SQL instance created"
