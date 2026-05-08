@@ -255,17 +255,17 @@ info "Building and pushing Docker images via Cloud Build (runs on GCP, no local 
 # Enable Cloud Build API
 gcloud services enable cloudbuild.googleapis.com --quiet
 
-# Grant Cloud Build service accounts the permissions they need
+# In newer GCP projects Cloud Build runs as the Compute default SA, not the
+# classic @cloudbuild SA. Grant both to cover either case.
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
 CLOUDBUILD_SA="${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
 COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
 
-# Cloud Build SA: push images + read/write build source in GCS
-bind_role "serviceAccount:${CLOUDBUILD_SA}" "roles/artifactregistry.admin"
-bind_role "serviceAccount:${CLOUDBUILD_SA}" "roles/storage.admin"
-
-# Compute SA: read build source from GCS (used internally by Cloud Build)
-bind_role "serviceAccount:${COMPUTE_SA}" "roles/storage.objectAdmin"
+for SA in "$CLOUDBUILD_SA" "$COMPUTE_SA"; do
+  bind_role "serviceAccount:${SA}" "roles/artifactregistry.admin"
+  bind_role "serviceAccount:${SA}" "roles/storage.admin"
+  bind_role "serviceAccount:${SA}" "roles/logging.logWriter"
+done
 
 info "Waiting 60s for IAM bindings to propagate before building..."
 sleep 60
