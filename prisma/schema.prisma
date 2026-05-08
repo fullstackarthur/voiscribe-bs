@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  JOINING
+  ACTIVE
+  ENDED
+  FAILED
+}
+
+model Meeting {
+  id         String          @id @default(uuid())
+  meetingUrl String
+  status     MeetingStatus   @default(SCHEDULED)
+  joinAt     DateTime
+  startedAt  DateTime?
+  endedAt    DateTime?
+  createdAt  DateTime        @default(now())
+  chunks     TranscriptChunk[]
+
+  @@map("meetings")
+}
+
+model TranscriptChunk {
+  id          String   @id @default(uuid())
+  meetingId   String
+  text        String
+  speaker     String   @default("unknown")
+  timestampMs Int
+  isFinal     Boolean
+  createdAt   DateTime @default(now())
+  meeting     Meeting  @relation(fields: [meetingId], references: [id])
+
+  @@index([meetingId])
+  @@map("transcript_chunks")
+}
