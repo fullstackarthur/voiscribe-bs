@@ -4,7 +4,7 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 const ApiConfigSchema = z.object({
-  databaseUrl: z.string().url(),
+  databaseUrl: z.string().min(1),
   cloudTasksProject: z.string().min(1),
   cloudTasksLocation: z.string().min(1),
   cloudTasksQueue: z.string().min(1),
@@ -14,7 +14,7 @@ const ApiConfigSchema = z.object({
 });
 
 const WorkerConfigSchema = z.object({
-  databaseUrl: z.string().url(),
+  databaseUrl: z.string().min(1),
   deepgramApiKey: z.string().min(1),
   googleAuthState: z.string().min(1),
   pulseSinkName: z.string().default("virtual_sink"),
