@@ -317,6 +317,9 @@ else
   PROXY_BIN=cloud-sql-proxy
 fi
 
+# Kill any leftover proxy from a previous run on port 5433
+fuser -k 5433/tcp 2>/dev/null || true
+
 # Start proxy in background on port 5433 (avoid conflict with local postgres)
 "$PROXY_BIN" "$CLOUD_SQL_CONN" --port=5433 &
 PROXY_PID=$!
