@@ -255,13 +255,17 @@ info "Building and pushing Docker images via Cloud Build (runs on GCP, no local 
 # Enable Cloud Build API
 gcloud services enable cloudbuild.googleapis.com --quiet
 
-# Grant Cloud Build permission to push to Artifact Registry
-CLOUDBUILD_SA="$(gcloud projects describe "$PROJECT_ID" \
-  --format='value(projectNumber)')@cloudbuild.gserviceaccount.com"
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${CLOUDBUILD_SA}" \
-  --role="roles/artifactregistry.writer" \
-  --quiet &>/dev/null
+# Grant Cloud Build service accounts the permissions they need
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+CLOUDBUILD_SA="${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
+COMPUTE_SA="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+
+# Cloud Build SA: push images + read/write build source in GCS
+bind_role "serviceAccount:${CLOUDBUILD_SA}" "roles/artifactregistry.writer"
+bind_role "serviceAccount:${CLOUDBUILD_SA}" "roles/storage.admin"
+
+# Compute SA: read build source from GCS (used internally by Cloud Build)
+bind_role "serviceAccount:${COMPUTE_SA}" "roles/storage.objectAdmin"
 
 # Detect repo root (script lives in scripts/ subdir)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
