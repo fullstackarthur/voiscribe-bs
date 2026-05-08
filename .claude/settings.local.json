@@ -16,7 +16,8 @@
       "Bash(docker context *)",
       "Bash(command -v psql)",
       "Bash(psql --version)",
-      "Bash(pnpm --filter @meetingbot/api test)"
+      "Bash(pnpm --filter @meetingbot/api test)",
+      "Bash(pnpm --filter @meetingbot/api build)"
     ]
   }
 }
