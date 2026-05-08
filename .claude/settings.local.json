@@ -10,7 +10,13 @@
       "Bash(pnpm --filter @meetingbot/logger test)",
       "Bash(pnpm --filter @meetingbot/config test)",
       "Bash(pnpm test *)",
-      "Bash(pnpm build *)"
+      "Bash(pnpm build *)",
+      "Bash(pnpm --filter @meetingbot/config build)",
+      "Bash(docker info *)",
+      "Bash(docker context *)",
+      "Bash(command -v psql)",
+      "Bash(psql --version)",
+      "Bash(pnpm --filter @meetingbot/api test)"
     ]
   }
 }
