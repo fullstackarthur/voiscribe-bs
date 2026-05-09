@@ -1,40 +1,87 @@
-import { chromium } from "playwright";
+/**
+ * Captures Google auth cookies from a running Chrome instance via CDP.
+ * Does NOT use Playwright — no browser is launched by this script.
+ *
+ * Usage:
+ *   1. Run the Chrome launch command printed below in a separate PowerShell window
+ *   2. Sign into the bot Google account in that Chrome
+ *   3. Navigate to https://meet.google.com
+ *   4. Run this script: npx tsx scripts/setup-google-auth.ts
+ */
 import * as fs from "fs";
 
-async function captureAuthState() {
-  console.log("Opening browser. Log in to the bot Google account.");
-  console.log("After logging in, navigate to https://meet.google.com");
-  console.log("The script saves auth state automatically and exits.\n");
+const CDP = "http://localhost:9222";
 
-  const context = await chromium.launchPersistentContext("/tmp/auth-setup", {
-    headless: false,
-    args: ["--no-sandbox"],
+async function getAllCookies(): Promise<any[]> {
+  const pages: any[] = await fetch(`${CDP}/json`).then((r) => r.json());
+  const target = pages.find((p) => p.type === "page") ?? pages[0];
+  if (!target) throw new Error("No pages found in Chrome.");
+
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("CDP timeout")), 10_000);
+    ws.addEventListener("open", () => {
+      ws.send(JSON.stringify({ id: 1, method: "Network.getAllCookies" }));
+    });
+    ws.addEventListener("message", (e: MessageEvent) => {
+      const msg = JSON.parse(e.data as string);
+      if (msg.id === 1) {
+        clearTimeout(timer);
+        ws.close();
+        resolve(msg.result?.cookies ?? []);
+      }
+    });
+    ws.addEventListener("error", () => reject(new Error("WebSocket error — is Chrome running with --remote-debugging-port=9222?")));
   });
-
-  try {
-    const page = await context.newPage();
-    await page.goto("https://accounts.google.com");
-
-    await page.waitForURL("**/meet.google.com**", { timeout: 300_000 });
-    console.log("Detected meet.google.com — saving auth state...");
-
-    const storageState = await context.storageState();
-    const json = JSON.stringify(storageState);
-
-    fs.writeFileSync("google-auth-state.json", json);
-    console.log("Saved to google-auth-state.json");
-    console.log("\nUpload to Secret Manager:");
-    console.log(
-      "  gcloud secrets create meetingbot-google-auth-state \\\n" +
-      "    --project=PROJECT_ID \\\n" +
-      "    --data-file=google-auth-state.json"
-    );
-  } finally {
-    await context.close();
-  }
 }
 
-captureAuthState().catch((err) => {
-  console.error(err);
+async function main() {
+  // Check if Chrome is reachable first
+  let chromeReady = false;
+  try {
+    await fetch(`${CDP}/json/version`);
+    chromeReady = true;
+  } catch {
+    // not running yet
+  }
+
+  if (!chromeReady) {
+    console.log("Chrome is not running with remote debugging. Open a new PowerShell window and run:\n");
+    console.log(`  & "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" \`\n    --remote-debugging-port=9222 \`\n    --user-data-dir="C:\\Temp\\bot-chrome" \`\n    "https://accounts.google.com"\n`);
+    console.log("Sign into the bot Google account, navigate to https://meet.google.com,");
+    console.log("then re-run this script.\n");
+    process.exit(1);
+  }
+
+  console.log("Connected to Chrome. Extracting cookies...");
+  const cookies = await getAllCookies();
+
+  const googleCookies = cookies.filter((c) =>
+    c.domain.includes("google.com") || c.domain.includes("accounts.google")
+  );
+
+  const storageState = {
+    cookies: googleCookies.map((c) => ({
+      name: c.name,
+      value: c.value,
+      domain: c.domain,
+      path: c.path,
+      expires: c.expires ?? -1,
+      httpOnly: c.httpOnly ?? false,
+      secure: c.secure ?? false,
+      sameSite: (c.sameSite as string) ?? "None",
+    })),
+    origins: [],
+  };
+
+  fs.writeFileSync("google-auth-state.json", JSON.stringify(storageState, null, 2));
+  console.log(`Saved ${googleCookies.length} Google cookies to google-auth-state.json`);
+  console.log("\nNow run:");
+  console.log("  gcloud secrets versions add meetingbot-google-auth-state --data-file=google-auth-state.json --project=voiscribe");
+}
+
+main().catch((err) => {
+  console.error("Error:", err.message);
   process.exit(1);
 });

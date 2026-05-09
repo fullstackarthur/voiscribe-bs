@@ -47,11 +47,24 @@ export async function launchAndJoinMeet(
 
   const page = await context.newPage();
 
+  page.on("console", (msg) => {
+    if (msg.type() === "error") {
+      logger.warn({ event: "BROWSER_CONSOLE_ERROR", text: msg.text() }, "Browser console error");
+    }
+  });
+
   logger.info({ event: "NAVIGATING_TO_MEET", meetingUrl }, "Navigating to Meet URL");
   await page.goto(meetingUrl, { waitUntil: "domcontentloaded" });
 
+  const pageUrl = page.url();
+  const pageTitle = await page.title().catch(() => "unknown");
+  logger.info({ event: "PAGE_LOADED", pageUrl, pageTitle }, "Page loaded after navigation");
+
   await disableCameraAndMic(page, logger);
   await clickJoinButton(page, logger);
+
+  const urlAfterJoin = page.url();
+  logger.info({ event: "URL_AFTER_JOIN", urlAfterJoin }, "URL after clicking join");
 
   logger.info({ event: "WAITING_FOR_ADMISSION" }, "Waiting for meeting admission");
   await waitUntilInMeeting(page, logger);
