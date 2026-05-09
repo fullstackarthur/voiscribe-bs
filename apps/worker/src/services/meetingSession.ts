@@ -7,6 +7,7 @@ import {
   cleanupBrowser,
   JoinResult,
 } from "../browser/meetJoiner";
+import { createSpeakerTracker, SpeakerTracker } from "../browser/speakerTracker";
 import { startAudioCapture, AudioPipeline } from "../audio/audioPipeline";
 import {
   startDeepgramTranscription,
@@ -32,6 +33,7 @@ export async function runMeetingSession(meeting: Meeting): Promise<void> {
   let joinResult: JoinResult | undefined;
   let audioPipeline: AudioPipeline | undefined;
   let deepgramSession: DeepgramSession | undefined;
+  let speakerTracker: SpeakerTracker | undefined;
   let sessionFailed = false;
 
   try {
@@ -48,13 +50,16 @@ export async function runMeetingSession(meeting: Meeting): Promise<void> {
 
     logger.info({ event: "SESSION_ACTIVE" }, "Meeting session is active");
 
+    speakerTracker = createSpeakerTracker(joinResult.page, meeting.id);
+
     audioPipeline = startAudioCapture(meeting.id, config.pulseSinkName);
 
     deepgramSession = startDeepgramTranscription(
       meeting.id,
       config.deepgramApiKey,
       audioPipeline.stream,
-      (chunk: TranscriptChunkEvent) => persistChunk(meeting.id, chunk, db)
+      (chunk: TranscriptChunkEvent) => persistChunk(meeting.id, chunk, db),
+      (speakerIndex: number) => speakerTracker!.getNameForSpeaker(speakerIndex)
     );
 
     logger.info({ event: "PIPELINE_RUNNING" }, "Audio and transcription pipeline running");
@@ -72,6 +77,7 @@ export async function runMeetingSession(meeting: Meeting): Promise<void> {
 
     throw err;
   } finally {
+    speakerTracker?.stop();
     deepgramSession?.stop();
     audioPipeline?.stop();
 
