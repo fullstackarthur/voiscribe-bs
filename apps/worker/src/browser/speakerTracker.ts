@@ -16,6 +16,8 @@ export function createSpeakerTracker(page: Page, meetingId: string): SpeakerTrac
   let currentSpeakerName: string | null = null;
   let stopped = false;
 
+  let pollCount = 0;
+
   async function poll() {
     while (!stopped) {
       try {
@@ -24,6 +26,25 @@ export function createSpeakerTracker(page: Page, meetingId: string): SpeakerTrac
           currentSpeakerName = name;
           logger.info({ event: "ACTIVE_SPEAKER_DETECTED", name }, "Active speaker detected");
         }
+
+        // Every 10s dump DOM snapshot for selector debugging
+        if (pollCount % 10 === 0) {
+          const snapshot = await page.evaluate((): string => {
+            const tiles = Array.from(document.querySelectorAll("[data-participant-id]"));
+            const tileInfo = tiles.map((t) => ({
+              id: t.getAttribute("data-participant-id"),
+              attrs: Array.from(t.attributes).map((a) => `${a.name}=${a.value}`).join(" "),
+              children: Array.from(t.querySelectorAll("*"))
+                .filter((el) => el.textContent?.trim())
+                .slice(0, 5)
+                .map((el) => `<${el.tagName.toLowerCase()} jsname="${el.getAttribute("jsname")}">${el.textContent?.trim()?.slice(0, 40)}</${el.tagName.toLowerCase()}>`)
+                .join(", "),
+            }));
+            return JSON.stringify(tileInfo);
+          }).catch(() => "eval failed");
+          logger.info({ event: "DOM_SNAPSHOT", snapshot }, "Speaker tracker DOM snapshot");
+        }
+        pollCount++;
       } catch {
         // page may be closing — ignore
       }
