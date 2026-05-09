@@ -58,13 +58,21 @@ export async function launchAndJoinMeet(
 
   const pageUrl = page.url();
   const pageTitle = await page.title().catch(() => "unknown");
-  logger.info({ event: "PAGE_LOADED", pageUrl, pageTitle }, "Page loaded after navigation");
+  const pageText = await page.innerText("body").catch(() => "could not extract body text");
+  logger.info(
+    { event: "PAGE_LOADED", pageUrl, pageTitle, pageText: pageText.slice(0, 3000) },
+    "Page loaded after navigation"
+  );
 
   await disableCameraAndMic(page, logger);
   await clickJoinButton(page, logger);
 
   const urlAfterJoin = page.url();
-  logger.info({ event: "URL_AFTER_JOIN", urlAfterJoin }, "URL after clicking join");
+  const textAfterJoin = await page.innerText("body").catch(() => "could not extract body text");
+  logger.info(
+    { event: "URL_AFTER_JOIN", urlAfterJoin, pageText: textAfterJoin.slice(0, 3000) },
+    "URL after clicking join"
+  );
 
   logger.info({ event: "WAITING_FOR_ADMISSION" }, "Waiting for meeting admission");
   await waitUntilInMeeting(page, logger);
