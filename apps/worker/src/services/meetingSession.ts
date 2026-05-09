@@ -40,7 +40,8 @@ export async function runMeetingSession(meeting: Meeting): Promise<void> {
     joinResult = await launchAndJoinMeet(
       meeting.meetingUrl,
       meeting.id,
-      config.googleAuthState
+      config.googleEmail,
+      config.googleAppPassword
     );
 
     await db.meeting.update({

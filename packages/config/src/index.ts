@@ -16,7 +16,8 @@ const ApiConfigSchema = z.object({
 const WorkerConfigSchema = z.object({
   databaseUrl: z.string().min(1),
   deepgramApiKey: z.string().min(1),
-  googleAuthState: z.string().min(1),
+  googleEmail: z.string().email(),
+  googleAppPassword: z.string().min(1),
   pulseSinkName: z.string().default("virtual_sink"),
   port: z.coerce.number().default(3001),
   workerId: z.string().default(() => `worker-${Date.now()}`),
@@ -41,7 +42,8 @@ export function parseWorkerConfig(): WorkerConfig {
   return WorkerConfigSchema.parse({
     databaseUrl: process.env["DATABASE_URL"],
     deepgramApiKey: process.env["DEEPGRAM_API_KEY"],
-    googleAuthState: process.env["GOOGLE_AUTH_STATE"],
+    googleEmail: process.env["GOOGLE_EMAIL"],
+    googleAppPassword: process.env["GOOGLE_APP_PASSWORD"],
     pulseSinkName: process.env["PULSE_SINK_NAME"],
     port: process.env["PORT"],
     workerId: process.env["WORKER_ID"],

@@ -1,6 +1,5 @@
 import { chromium, Browser, BrowserContext, Page } from "playwright";
 import { createLogger } from "@meetingbot/logger";
-import * as fs from "fs";
 
 export type JoinResult = {
   browser: Browser;
@@ -14,16 +13,13 @@ const MEETING_END_POLL_MS = 5_000;
 export async function launchAndJoinMeet(
   meetingUrl: string,
   meetingId: string,
-  googleAuthStateJson: string
+  googleEmail: string,
+  googleAppPassword: string
 ): Promise<JoinResult> {
   const logger = createLogger({ meetingId });
 
-  const authStatePath = `/tmp/auth-state-${meetingId}.json`;
-  fs.writeFileSync(authStatePath, googleAuthStateJson);
-
   logger.info({ event: "BROWSER_LAUNCHING" }, "Launching Chromium");
 
-  // Launch browser first (no storageState here)
   const browser = await chromium.launch({
     headless: false,
     args: [
@@ -37,15 +33,11 @@ export async function launchAndJoinMeet(
     ],
   });
 
-  // Create context WITH storageState so cookies are loaded before any navigation
   const context = await browser.newContext({
-    storageState: authStatePath,
     permissions: ["camera", "microphone"],
     userAgent:
       "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
   });
-
-  fs.rmSync(authStatePath, { force: true });
 
   // Hide automation signals so Google doesn't block the session
   await context.addInitScript(() => {
@@ -59,6 +51,9 @@ export async function launchAndJoinMeet(
       logger.warn({ event: "BROWSER_CONSOLE_ERROR", text: msg.text() }, "Browser console error");
     }
   });
+
+  // Sign into Google first
+  await signInWithCredentials(page, googleEmail, googleAppPassword, logger);
 
   logger.info({ event: "NAVIGATING_TO_MEET", meetingUrl }, "Navigating to Meet URL");
   await page.goto(meetingUrl, { waitUntil: "domcontentloaded" });
@@ -87,6 +82,58 @@ export async function launchAndJoinMeet(
   logger.info({ event: "MEETING_JOINED" }, "Bot has joined the meeting");
 
   return { browser, context, page };
+}
+
+async function signInWithCredentials(
+  page: Page,
+  email: string,
+  appPassword: string,
+  logger: ReturnType<typeof createLogger>
+): Promise<void> {
+  logger.info({ event: "GOOGLE_SIGNIN_START" }, "Signing into Google with credentials");
+
+  await page.goto("https://accounts.google.com/signin/v2/identifier", {
+    waitUntil: "domcontentloaded",
+  });
+
+  // Enter email
+  try {
+    await page.waitForSelector('input[type="email"]', { timeout: 15_000 });
+    await page.fill('input[type="email"]', email);
+    await page.click('#identifierNext, [jsname="LgbsSe"]');
+    logger.info({ event: "GOOGLE_EMAIL_ENTERED" }, "Email entered");
+  } catch (err) {
+    logger.warn({ event: "GOOGLE_EMAIL_FAILED", err }, "Could not enter email");
+    throw new Error(`Google sign-in failed at email step: ${err}`);
+  }
+
+  // Enter password (App Password — bypasses 2FA)
+  try {
+    await page.waitForSelector('input[type="password"]', { timeout: 15_000 });
+    await page.fill('input[type="password"]', appPassword);
+    await page.click('#passwordNext, [jsname="LgbsSe"]');
+    logger.info({ event: "GOOGLE_PASSWORD_ENTERED" }, "App password entered");
+  } catch (err) {
+    logger.warn({ event: "GOOGLE_PASSWORD_FAILED", err }, "Could not enter password");
+    throw new Error(`Google sign-in failed at password step: ${err}`);
+  }
+
+  // Wait for redirect away from accounts.google.com (sign-in complete)
+  try {
+    await page.waitForFunction(
+      () => !window.location.hostname.includes("accounts.google.com"),
+      { timeout: 20_000 }
+    );
+    logger.info({ event: "GOOGLE_SIGNIN_COMPLETE" }, "Google sign-in complete");
+  } catch {
+    // Check if we're on an error page
+    const url = page.url();
+    const bodyText = await page.innerText("body").catch(() => "");
+    logger.warn(
+      { event: "GOOGLE_SIGNIN_TIMEOUT", url, bodyText: bodyText.slice(0, 1000) },
+      "Sign-in redirect timed out — continuing anyway"
+    );
+  }
 }
 
 async function disableCameraAndMic(
