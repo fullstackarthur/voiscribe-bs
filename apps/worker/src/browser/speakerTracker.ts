@@ -58,13 +58,13 @@ export function createSpeakerTracker(page: Page, meetingId: string): SpeakerTrac
 
 async function getActiveSpeakerName(page: Page): Promise<string | null> {
   return page
-    .evaluate(() => {
+    .evaluate((): string | null => {
       // Strategy 1: participant tile with a visible audio/speaking indicator
-      const tiles = Array.from(document.querySelectorAll("[data-participant-id]"));
+      const tiles = Array.from(document.querySelectorAll("[data-participant-id]")) as Element[];
       for (const tile of tiles) {
         const hasSpeakingIndicator =
-          tile.querySelector("[jsname='EjAkre']") || // audio level bars
-          tile.querySelector("[jsname='Zf6De']") || // alt audio indicator
+          tile.querySelector("[jsname='EjAkre']") ||
+          tile.querySelector("[jsname='Zf6De']") ||
           tile.getAttribute("data-is-speaking") === "true";
 
         if (hasSpeakingIndicator) {
