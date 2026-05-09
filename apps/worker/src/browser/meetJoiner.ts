@@ -32,6 +32,7 @@ export async function launchAndJoinMeet(
       "--use-fake-ui-for-media-stream",
       "--disable-dev-shm-usage",
       "--disable-features=VizDisplayCompositor",
+      "--disable-blink-features=AutomationControlled",
       `--display=${process.env["DISPLAY"] ?? ":99"}`,
     ],
   });
@@ -45,6 +46,11 @@ export async function launchAndJoinMeet(
   });
 
   fs.rmSync(authStatePath, { force: true });
+
+  // Hide automation signals so Google doesn't block the session
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, "webdriver", { get: () => false });
+  });
 
   const page = await context.newPage();
 
