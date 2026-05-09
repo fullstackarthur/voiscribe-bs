@@ -1,8 +1,9 @@
-import { chromium, BrowserContext, Page } from "playwright";
+import { chromium, Browser, BrowserContext, Page } from "playwright";
 import { createLogger } from "@meetingbot/logger";
 import * as fs from "fs";
 
 export type JoinResult = {
+  browser: Browser;
   context: BrowserContext;
   page: Page;
 };
@@ -18,32 +19,32 @@ export async function launchAndJoinMeet(
   const logger = createLogger({ meetingId });
 
   const authStatePath = `/tmp/auth-state-${meetingId}.json`;
+  fs.writeFileSync(authStatePath, googleAuthStateJson);
 
   logger.info({ event: "BROWSER_LAUNCHING" }, "Launching Chromium");
 
-  const context = await chromium.launchPersistentContext(
-    `/tmp/browser-data-${meetingId}`,
-    {
-      headless: false,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--use-fake-ui-for-media-stream",
-        "--disable-dev-shm-usage",
-        "--disable-features=VizDisplayCompositor",
-        `--display=${process.env["DISPLAY"] ?? ":99"}`,
-      ],
-      permissions: ["camera", "microphone"],
-      ignoreDefaultArgs: ["--mute-audio"],
-    }
-  );
+  // Launch browser first (no storageState here)
+  const browser = await chromium.launch({
+    headless: false,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--use-fake-ui-for-media-stream",
+      "--disable-dev-shm-usage",
+      "--disable-features=VizDisplayCompositor",
+      `--display=${process.env["DISPLAY"] ?? ":99"}`,
+    ],
+  });
 
-  fs.writeFileSync(authStatePath, googleAuthStateJson);
-  try {
-    await context.setStorageState(authStatePath);
-  } finally {
-    fs.rmSync(authStatePath, { force: true });
-  }
+  // Create context WITH storageState so cookies are loaded before any navigation
+  const context = await browser.newContext({
+    storageState: authStatePath,
+    permissions: ["camera", "microphone"],
+    userAgent:
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  });
+
+  fs.rmSync(authStatePath, { force: true });
 
   const page = await context.newPage();
 
@@ -79,7 +80,7 @@ export async function launchAndJoinMeet(
 
   logger.info({ event: "MEETING_JOINED" }, "Bot has joined the meeting");
 
-  return { context, page };
+  return { browser, context, page };
 }
 
 async function disableCameraAndMic(
@@ -190,17 +191,16 @@ export async function waitForMeetingEnd(page: Page, meetingId: string): Promise<
 }
 
 export async function cleanupBrowser(
-  context: BrowserContext,
+  joinResult: JoinResult,
   meetingId: string
 ): Promise<void> {
   const logger = createLogger({ meetingId });
 
   try {
-    await context.close();
+    await joinResult.context.close();
+    await joinResult.browser.close();
     logger.info({ event: "BROWSER_CLOSED" }, "Browser context closed");
   } catch (err) {
     logger.warn({ event: "BROWSER_CLOSE_FAILED", err }, "Failed to close browser gracefully");
   }
-
-  fs.rmSync(`/tmp/browser-data-${meetingId}`, { recursive: true, force: true });
 }

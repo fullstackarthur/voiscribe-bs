@@ -75,8 +75,8 @@ export async function runMeetingSession(meeting: Meeting): Promise<void> {
     deepgramSession?.stop();
     audioPipeline?.stop();
 
-    if (joinResult?.context) {
-      await cleanupBrowser(joinResult.context, meeting.id);
+    if (joinResult) {
+      await cleanupBrowser(joinResult, meeting.id);
     }
 
     if (!sessionFailed) {
