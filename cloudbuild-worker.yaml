@@ -3,10 +3,10 @@ steps:
     args:
       - build
       - -t
-      - gcr.io/$PROJECT_ID/meetingbot-worker:latest
+      - us-central1-docker.pkg.dev/$PROJECT_ID/meetingbot/meetingbot-worker:latest
       - -f
       - apps/worker/Dockerfile
       - .
 
 images:
-  - gcr.io/$PROJECT_ID/meetingbot-worker:latest
+  - us-central1-docker.pkg.dev/$PROJECT_ID/meetingbot/meetingbot-worker:latest
