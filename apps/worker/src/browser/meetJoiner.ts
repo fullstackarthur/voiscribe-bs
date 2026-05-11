@@ -100,7 +100,7 @@ async function signInWithCredentials(
   try {
     await page.waitForSelector('input[type="email"]', { timeout: 15_000 });
     await page.fill('input[type="email"]', email);
-    await page.click('#identifierNext, [jsname="LgbsSe"]');
+    await page.keyboard.press("Enter");
     logger.info({ event: "GOOGLE_EMAIL_ENTERED" }, "Email entered");
   } catch (err) {
     logger.warn({ event: "GOOGLE_EMAIL_FAILED", err }, "Could not enter email");
@@ -111,7 +111,7 @@ async function signInWithCredentials(
   try {
     await page.waitForSelector('input[type="password"]', { timeout: 15_000 });
     await page.fill('input[type="password"]', appPassword);
-    await page.click('#passwordNext, [jsname="LgbsSe"]');
+    await page.keyboard.press("Enter");
     logger.info({ event: "GOOGLE_PASSWORD_ENTERED" }, "App password entered");
   } catch (err) {
     logger.warn({ event: "GOOGLE_PASSWORD_FAILED", err }, "Could not enter password");
