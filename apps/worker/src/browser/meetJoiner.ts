@@ -1,5 +1,6 @@
 import { chromium, Browser, BrowserContext, Page } from "playwright";
 import { createLogger } from "@meetingbot/logger";
+import * as fs from "fs";
 
 export type JoinResult = {
   browser: Browser;
@@ -13,10 +14,12 @@ const MEETING_END_POLL_MS = 5_000;
 export async function launchAndJoinMeet(
   meetingUrl: string,
   meetingId: string,
-  googleEmail: string,
-  googleAppPassword: string
+  googleAuthStateJson: string
 ): Promise<JoinResult> {
   const logger = createLogger({ meetingId });
+
+  const authStatePath = `/tmp/auth-state-${meetingId}.json`;
+  fs.writeFileSync(authStatePath, googleAuthStateJson);
 
   logger.info({ event: "BROWSER_LAUNCHING" }, "Launching Chromium");
 
@@ -34,12 +37,14 @@ export async function launchAndJoinMeet(
   });
 
   const context = await browser.newContext({
+    storageState: authStatePath,
     permissions: ["camera", "microphone"],
     userAgent:
       "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
   });
 
-  // Hide automation signals so Google doesn't block the session
+  fs.rmSync(authStatePath, { force: true });
+
   await context.addInitScript(() => {
     Object.defineProperty(navigator, "webdriver", { get: () => false });
   });
@@ -52,9 +57,6 @@ export async function launchAndJoinMeet(
     }
   });
 
-  // Sign into Google first
-  await signInWithCredentials(page, googleEmail, googleAppPassword, logger);
-
   logger.info({ event: "NAVIGATING_TO_MEET", meetingUrl }, "Navigating to Meet URL");
   await page.goto(meetingUrl, { waitUntil: "domcontentloaded" });
 
@@ -65,6 +67,13 @@ export async function launchAndJoinMeet(
     { event: "PAGE_LOADED", pageUrl, pageTitle, pageText: pageText.slice(0, 3000) },
     "Page loaded after navigation"
   );
+
+  // If redirected to sign-in, cookies have expired
+  if (pageTitle.toLowerCase().includes("sign in") || pageUrl.includes("accounts.google.com")) {
+    throw new Error(
+      "Google session expired — cookies are no longer valid. Re-run the auth refresh script."
+    );
+  }
 
   await disableCameraAndMic(page, logger);
   await clickJoinButton(page, logger);
@@ -82,78 +91,6 @@ export async function launchAndJoinMeet(
   logger.info({ event: "MEETING_JOINED" }, "Bot has joined the meeting");
 
   return { browser, context, page };
-}
-
-async function signInWithCredentials(
-  page: Page,
-  email: string,
-  appPassword: string,
-  logger: ReturnType<typeof createLogger>
-): Promise<void> {
-  logger.info({ event: "GOOGLE_SIGNIN_START" }, "Signing into Google with credentials");
-
-  await page.goto("https://accounts.google.com/signin/v2/identifier", {
-    waitUntil: "domcontentloaded",
-  });
-
-  // Enter email
-  try {
-    const emailInput = page.locator('input[type="email"]').first();
-    await emailInput.waitFor({ state: "visible", timeout: 15_000 });
-    await emailInput.click();
-    await emailInput.type(email, { delay: 50 });
-    await page.waitForTimeout(500);
-    // Click the visible Next button by ID
-    await page.locator('#identifierNext').click();
-    logger.info({ event: "GOOGLE_EMAIL_ENTERED" }, "Email entered and Next clicked");
-  } catch (err) {
-    const bodyText = await page.innerText("body").catch(() => "");
-    logger.warn({ event: "GOOGLE_EMAIL_FAILED", bodyText: bodyText.slice(0, 500), err }, "Could not enter email");
-    throw new Error(`Google sign-in failed at email step: ${err}`);
-  }
-
-  // Wait for password page to fully load after email submission
-  try {
-    await page.waitForSelector('input[name="Passwd"]', { timeout: 15_000, state: "visible" });
-    await page.waitForTimeout(800);
-  } catch (err) {
-    const bodyText = await page.innerText("body").catch(() => "");
-    logger.warn({ event: "GOOGLE_PASSWORD_PAGE_FAILED", bodyText: bodyText.slice(0, 500), err }, "Password page did not appear");
-    throw new Error(`Google sign-in failed waiting for password page: ${err}`);
-  }
-
-  // Enter password (App Password — bypasses 2FA)
-  try {
-    const passwordInput = page.locator('input[name="Passwd"]').first();
-    await passwordInput.click();
-    await passwordInput.type(appPassword, { delay: 50 });
-    await page.waitForTimeout(500);
-    await page.locator('#passwordNext').click();
-    logger.info({ event: "GOOGLE_PASSWORD_ENTERED" }, "App password entered and Next clicked");
-  } catch (err) {
-    logger.warn({ event: "GOOGLE_PASSWORD_FAILED", err }, "Could not enter password");
-    throw new Error(`Google sign-in failed at password step: ${err}`);
-  }
-
-  // Wait for redirect away from accounts.google.com (sign-in complete)
-  try {
-    await page.waitForFunction(
-      () => !window.location.hostname.includes("accounts.google.com"),
-      { timeout: 20_000 }
-    );
-    logger.info({ event: "GOOGLE_SIGNIN_COMPLETE" }, "Google sign-in complete");
-  } catch {
-    const url = page.url();
-    const bodyText = await page.innerText("body").catch(() => "");
-    logger.warn(
-      { event: "GOOGLE_SIGNIN_TIMEOUT", url, bodyText: bodyText.slice(0, 1000) },
-      "Sign-in redirect timed out — continuing anyway"
-    );
-    // If still on password page, the password was rejected — abort
-    if (url.includes("accounts.google.com")) {
-      throw new Error(`Google sign-in failed — still on accounts.google.com after password. Body: ${bodyText.slice(0, 300)}`);
-    }
-  }
 }
 
 async function disableCameraAndMic(
