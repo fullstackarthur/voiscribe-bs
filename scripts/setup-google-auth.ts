@@ -60,10 +60,22 @@ async function captureAuthState() {
 
   const cookieCount = storageState.cookies.length;
   console.log(`✅ Saved ${cookieCount} cookies to google-auth-state.json`);
-  console.log("\nNow upload to Secret Manager:");
-  console.log(
-    "  gcloud secrets versions add meetingbot-google-auth-state --data-file=google-auth-state.json --project=voiscribe"
-  );
+
+  // Auto-upload to Secret Manager if gcloud is available
+  console.log("\nUploading to Secret Manager...");
+  const { execSync } = await import("child_process");
+  try {
+    execSync(
+      "gcloud secrets versions add meetingbot-google-auth-state --data-file=google-auth-state.json --project=voiscribe",
+      { stdio: "inherit" }
+    );
+    console.log("✅ Secret Manager updated — cookies are live.");
+  } catch {
+    console.log("⚠️  Auto-upload failed. Run manually:");
+    console.log(
+      "  gcloud secrets versions add meetingbot-google-auth-state --data-file=google-auth-state.json --project=voiscribe"
+    );
+  }
 
   await context.close();
   fs.rmSync(AUTH_DIR, { recursive: true, force: true });
