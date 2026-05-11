@@ -98,8 +98,9 @@ async function signInWithCredentials(
 
   // Enter email
   try {
-    await page.waitForSelector('input[type="email"]', { timeout: 15_000 });
+    await page.waitForSelector('input[type="email"]', { timeout: 15_000, state: "visible" });
     await page.fill('input[type="email"]', email);
+    await page.waitForTimeout(500);
     await page.keyboard.press("Enter");
     logger.info({ event: "GOOGLE_EMAIL_ENTERED" }, "Email entered");
   } catch (err) {
@@ -107,10 +108,20 @@ async function signInWithCredentials(
     throw new Error(`Google sign-in failed at email step: ${err}`);
   }
 
+  // Wait for password page to fully load after email submission
+  try {
+    await page.waitForSelector('input[type="password"]', { timeout: 15_000, state: "visible" });
+    await page.waitForTimeout(800);
+  } catch (err) {
+    const bodyText = await page.innerText("body").catch(() => "");
+    logger.warn({ event: "GOOGLE_PASSWORD_PAGE_FAILED", bodyText: bodyText.slice(0, 500), err }, "Password page did not appear");
+    throw new Error(`Google sign-in failed waiting for password page: ${err}`);
+  }
+
   // Enter password (App Password — bypasses 2FA)
   try {
-    await page.waitForSelector('input[type="password"]', { timeout: 15_000 });
-    await page.fill('input[type="password"]', appPassword);
+    await page.type('input[type="password"]', appPassword, { delay: 50 });
+    await page.waitForTimeout(500);
     await page.keyboard.press("Enter");
     logger.info({ event: "GOOGLE_PASSWORD_ENTERED" }, "App password entered");
   } catch (err) {
@@ -126,13 +137,16 @@ async function signInWithCredentials(
     );
     logger.info({ event: "GOOGLE_SIGNIN_COMPLETE" }, "Google sign-in complete");
   } catch {
-    // Check if we're on an error page
     const url = page.url();
     const bodyText = await page.innerText("body").catch(() => "");
     logger.warn(
       { event: "GOOGLE_SIGNIN_TIMEOUT", url, bodyText: bodyText.slice(0, 1000) },
       "Sign-in redirect timed out — continuing anyway"
     );
+    // If still on password page, the password was rejected — abort
+    if (url.includes("accounts.google.com")) {
+      throw new Error(`Google sign-in failed — still on accounts.google.com after password. Body: ${bodyText.slice(0, 300)}`);
+    }
   }
 }
 
