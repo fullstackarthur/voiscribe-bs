@@ -98,19 +98,23 @@ async function signInWithCredentials(
 
   // Enter email
   try {
-    await page.waitForSelector('input[type="email"]', { timeout: 15_000, state: "visible" });
-    await page.fill('input[type="email"]', email);
+    const emailInput = page.locator('input[type="email"]').first();
+    await emailInput.waitFor({ state: "visible", timeout: 15_000 });
+    await emailInput.click();
+    await emailInput.type(email, { delay: 50 });
     await page.waitForTimeout(500);
-    await page.keyboard.press("Enter");
-    logger.info({ event: "GOOGLE_EMAIL_ENTERED" }, "Email entered");
+    // Click the visible Next button by ID
+    await page.locator('#identifierNext').click();
+    logger.info({ event: "GOOGLE_EMAIL_ENTERED" }, "Email entered and Next clicked");
   } catch (err) {
-    logger.warn({ event: "GOOGLE_EMAIL_FAILED", err }, "Could not enter email");
+    const bodyText = await page.innerText("body").catch(() => "");
+    logger.warn({ event: "GOOGLE_EMAIL_FAILED", bodyText: bodyText.slice(0, 500), err }, "Could not enter email");
     throw new Error(`Google sign-in failed at email step: ${err}`);
   }
 
   // Wait for password page to fully load after email submission
   try {
-    await page.waitForSelector('input[type="password"]', { timeout: 15_000, state: "visible" });
+    await page.waitForSelector('input[name="Passwd"]', { timeout: 15_000, state: "visible" });
     await page.waitForTimeout(800);
   } catch (err) {
     const bodyText = await page.innerText("body").catch(() => "");
@@ -120,10 +124,12 @@ async function signInWithCredentials(
 
   // Enter password (App Password — bypasses 2FA)
   try {
-    await page.type('input[type="password"]', appPassword, { delay: 50 });
+    const passwordInput = page.locator('input[name="Passwd"]').first();
+    await passwordInput.click();
+    await passwordInput.type(appPassword, { delay: 50 });
     await page.waitForTimeout(500);
-    await page.keyboard.press("Enter");
-    logger.info({ event: "GOOGLE_PASSWORD_ENTERED" }, "App password entered");
+    await page.locator('#passwordNext').click();
+    logger.info({ event: "GOOGLE_PASSWORD_ENTERED" }, "App password entered and Next clicked");
   } catch (err) {
     logger.warn({ event: "GOOGLE_PASSWORD_FAILED", err }, "Could not enter password");
     throw new Error(`Google sign-in failed at password step: ${err}`);
