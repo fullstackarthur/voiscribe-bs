@@ -27,8 +27,8 @@ export function createSpeakerTracker(page: Page, meetingId: string): SpeakerTrac
           logger.info({ event: "ACTIVE_SPEAKER_DETECTED", name }, "Active speaker detected");
         }
 
-        // Every 10s dump DOM snapshot for selector debugging
-        if (pollCount % 10 === 0) {
+        // Every 5 minutes dump DOM snapshot for selector debugging
+        if (pollCount % 300 === 0) {
           const snapshot = await page.evaluate((): string => {
             const tiles = Array.from(document.querySelectorAll("[data-participant-id]"));
             const tileInfo = tiles.map((t) => ({
