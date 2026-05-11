@@ -51,7 +51,7 @@ export function startDeepgramTranscription(
     punctuate: true,
     interim_results: true,
     endpointing: 300,
-    language: "multi",
+    detect_language: true,
     diarize: true,
   });
 
