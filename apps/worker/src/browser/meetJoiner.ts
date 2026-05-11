@@ -69,9 +69,14 @@ export async function launchAndJoinMeet(
   );
 
   // If redirected to sign-in, cookies have expired
-  if (pageTitle.toLowerCase().includes("sign in") || pageUrl.includes("accounts.google.com")) {
+  if (
+    pageTitle.toLowerCase().includes("sign in") ||
+    pageUrl.includes("accounts.google.com") ||
+    pageText.toLowerCase().includes("sign in\n") ||
+    pageText.includes("Use your Google Account")
+  ) {
     throw new Error(
-      "Google session expired — cookies are no longer valid. Re-run the auth refresh script."
+      "COOKIES_EXPIRED: Google session expired — re-run the auth refresh script and upload new cookies to Secret Manager."
     );
   }
 
