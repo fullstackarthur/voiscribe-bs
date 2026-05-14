@@ -14,6 +14,7 @@ import {
   TranscriptChunkEvent,
   DeepgramSession,
 } from "../transcription/deepgram";
+import { sendTranscriptEmailForMeeting } from "./transcriptEmail";
 
 export async function runMeetingSession(meeting: Meeting): Promise<void> {
   const config = parseWorkerConfig();
@@ -35,12 +36,14 @@ export async function runMeetingSession(meeting: Meeting): Promise<void> {
   let deepgramSession: DeepgramSession | undefined;
   let speakerTracker: SpeakerTracker | undefined;
   let sessionFailed = false;
+  const pendingChunkWrites = new Set<Promise<void>>();
 
   try {
     joinResult = await launchAndJoinMeet(
       meeting.meetingUrl,
       meeting.id,
-      config.googleAuthState
+      config.googleAuthState ?? "",
+      config.chromeUserDataDir
     );
 
     await db.meeting.update({
@@ -58,8 +61,16 @@ export async function runMeetingSession(meeting: Meeting): Promise<void> {
       meeting.id,
       config.deepgramApiKey,
       audioPipeline.stream,
-      (chunk: TranscriptChunkEvent) => persistChunk(meeting.id, chunk, db),
-      (speakerIndex: number) => speakerTracker!.getNameForSpeaker(speakerIndex)
+      (chunk: TranscriptChunkEvent) => {
+        const write = persistChunk(meeting.id, chunk, db).finally(() => {
+          pendingChunkWrites.delete(write);
+        });
+        pendingChunkWrites.add(write);
+        return write;
+      },
+      (speakerIndex: number) => speakerTracker!.getNameForSpeaker(speakerIndex),
+      config.deepgramModel,
+      config.deepgramLanguage
     );
 
     logger.info({ event: "PIPELINE_RUNNING" }, "Audio and transcription pipeline running");
@@ -86,12 +97,27 @@ export async function runMeetingSession(meeting: Meeting): Promise<void> {
     }
 
     if (!sessionFailed) {
+      await Promise.allSettled(pendingChunkWrites);
+
       await db.meeting
         .update({
           where: { id: meeting.id },
           data: { status: "ENDED", endedAt: new Date() },
         })
         .catch(() => {});
+
+      await sendTranscriptEmailForMeeting(meeting.id, db, {
+        clientId: config.gmailClientId,
+        clientSecret: config.gmailClientSecret,
+        refreshToken: config.gmailRefreshToken,
+        senderEmail: config.gmailSenderEmail,
+        recipientEmail: config.transcriptEmailTo,
+      }).catch((err) => {
+        logger.error(
+          { event: "TRANSCRIPT_EMAIL_FAILED", err },
+          "Failed to send transcript email"
+        );
+      });
     }
 
     logger.info({ event: "SESSION_CLEANUP_COMPLETE" }, "Session cleanup complete");

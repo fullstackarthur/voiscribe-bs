@@ -39,7 +39,7 @@ const zod_1 = require("zod");
 const dotenv = __importStar(require("dotenv"));
 dotenv.config();
 const ApiConfigSchema = zod_1.z.object({
-    databaseUrl: zod_1.z.string().url(),
+    databaseUrl: zod_1.z.string().min(1),
     cloudTasksProject: zod_1.z.string().min(1),
     cloudTasksLocation: zod_1.z.string().min(1),
     cloudTasksQueue: zod_1.z.string().min(1),
@@ -47,13 +47,31 @@ const ApiConfigSchema = zod_1.z.object({
     serviceAccountEmail: zod_1.z.string().email(),
     port: zod_1.z.coerce.number().default(3000),
 });
-const WorkerConfigSchema = zod_1.z.object({
-    databaseUrl: zod_1.z.string().url(),
+const WorkerConfigSchema = zod_1.z
+    .object({
+    databaseUrl: zod_1.z.string().min(1),
     deepgramApiKey: zod_1.z.string().min(1),
-    googleAuthState: zod_1.z.string().min(1),
+    deepgramModel: zod_1.z.string().min(1).default("nova-3"),
+    deepgramLanguage: zod_1.z.string().min(1).default("multi"),
+    googleAuthState: zod_1.z.string().min(1).optional(),
+    transcriptEmailTo: zod_1.z.string().email().default("arjhnpr@gmail.com"),
+    gmailClientId: zod_1.z.string().min(1).optional(),
+    gmailClientSecret: zod_1.z.string().min(1).optional(),
+    gmailRefreshToken: zod_1.z.string().min(1).optional(),
+    gmailSenderEmail: zod_1.z.string().email().optional(),
+    chromeUserDataDir: zod_1.z.string().min(1).optional(),
     pulseSinkName: zod_1.z.string().default("virtual_sink"),
     port: zod_1.z.coerce.number().default(3001),
     workerId: zod_1.z.string().default(() => `worker-${Date.now()}`),
+})
+    .superRefine((value, ctx) => {
+    if (!value.googleAuthState && !value.chromeUserDataDir) {
+        ctx.addIssue({
+            code: zod_1.z.ZodIssueCode.custom,
+            path: ["googleAuthState"],
+            message: "GOOGLE_AUTH_STATE is required when CHROME_USER_DATA_DIR is not set",
+        });
+    }
 });
 function parseApiConfig() {
     return ApiConfigSchema.parse({
@@ -70,7 +88,15 @@ function parseWorkerConfig() {
     return WorkerConfigSchema.parse({
         databaseUrl: process.env["DATABASE_URL"],
         deepgramApiKey: process.env["DEEPGRAM_API_KEY"],
+        deepgramModel: process.env["DEEPGRAM_MODEL"],
+        deepgramLanguage: process.env["DEEPGRAM_LANGUAGE"],
         googleAuthState: process.env["GOOGLE_AUTH_STATE"],
+        transcriptEmailTo: process.env["TRANSCRIPT_EMAIL_TO"],
+        gmailClientId: process.env["GMAIL_CLIENT_ID"],
+        gmailClientSecret: process.env["GMAIL_CLIENT_SECRET"],
+        gmailRefreshToken: process.env["GMAIL_REFRESH_TOKEN"],
+        gmailSenderEmail: process.env["GMAIL_SENDER_EMAIL"],
+        chromeUserDataDir: process.env["CHROME_USER_DATA_DIR"],
         pulseSinkName: process.env["PULSE_SINK_NAME"],
         port: process.env["PORT"],
         workerId: process.env["WORKER_ID"],

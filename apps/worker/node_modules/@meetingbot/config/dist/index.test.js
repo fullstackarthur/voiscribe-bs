@@ -71,7 +71,58 @@ const ORIGINAL_ENV = { ...process.env };
         const { parseWorkerConfig } = await Promise.resolve().then(() => __importStar(require("./index")));
         const config = parseWorkerConfig();
         (0, vitest_1.expect)(config.deepgramApiKey).toBe("dg-key-123");
+        (0, vitest_1.expect)(config.deepgramModel).toBe("nova-3");
+        (0, vitest_1.expect)(config.deepgramLanguage).toBe("multi");
+        (0, vitest_1.expect)(config.transcriptEmailTo).toBe("arjhnpr@gmail.com");
         (0, vitest_1.expect)(config.pulseSinkName).toBe("virtual_sink");
+    });
+    (0, vitest_1.it)("parses transcript email settings", async () => {
+        process.env["DATABASE_URL"] = "postgresql://user:pass@localhost:5432/db";
+        process.env["DEEPGRAM_API_KEY"] = "dg-key-123";
+        process.env["GOOGLE_AUTH_STATE"] = JSON.stringify({ cookies: [] });
+        process.env["TRANSCRIPT_EMAIL_TO"] = "recipient@example.com";
+        process.env["GMAIL_CLIENT_ID"] = "client-id";
+        process.env["GMAIL_CLIENT_SECRET"] = "client-secret";
+        process.env["GMAIL_REFRESH_TOKEN"] = "refresh-token";
+        process.env["GMAIL_SENDER_EMAIL"] = "bot@example.com";
+        process.env["CHROME_USER_DATA_DIR"] = "/data/chrome-profile";
+        const { parseWorkerConfig } = await Promise.resolve().then(() => __importStar(require("./index")));
+        const config = parseWorkerConfig();
+        (0, vitest_1.expect)(config.transcriptEmailTo).toBe("recipient@example.com");
+        (0, vitest_1.expect)(config.gmailClientId).toBe("client-id");
+        (0, vitest_1.expect)(config.gmailClientSecret).toBe("client-secret");
+        (0, vitest_1.expect)(config.gmailRefreshToken).toBe("refresh-token");
+        (0, vitest_1.expect)(config.gmailSenderEmail).toBe("bot@example.com");
+        (0, vitest_1.expect)(config.chromeUserDataDir).toBe("/data/chrome-profile");
+    });
+    (0, vitest_1.it)("allows Deepgram model and language overrides", async () => {
+        process.env["DATABASE_URL"] = "postgresql://user:pass@localhost:5432/db";
+        process.env["DEEPGRAM_API_KEY"] = "dg-key-123";
+        process.env["DEEPGRAM_MODEL"] = "nova-2";
+        process.env["DEEPGRAM_LANGUAGE"] = "hi";
+        process.env["GOOGLE_AUTH_STATE"] = JSON.stringify({ cookies: [] });
+        const { parseWorkerConfig } = await Promise.resolve().then(() => __importStar(require("./index")));
+        const config = parseWorkerConfig();
+        (0, vitest_1.expect)(config.deepgramModel).toBe("nova-2");
+        (0, vitest_1.expect)(config.deepgramLanguage).toBe("hi");
+    });
+    (0, vitest_1.it)("allows a Chrome profile instead of GOOGLE_AUTH_STATE", async () => {
+        process.env["DATABASE_URL"] = "postgresql://user:pass@localhost:5432/db";
+        process.env["DEEPGRAM_API_KEY"] = "dg-key-123";
+        process.env["CHROME_USER_DATA_DIR"] = "/data/chrome-profile";
+        delete process.env["GOOGLE_AUTH_STATE"];
+        const { parseWorkerConfig } = await Promise.resolve().then(() => __importStar(require("./index")));
+        const config = parseWorkerConfig();
+        (0, vitest_1.expect)(config.googleAuthState).toBeUndefined();
+        (0, vitest_1.expect)(config.chromeUserDataDir).toBe("/data/chrome-profile");
+    });
+    (0, vitest_1.it)("throws when both GOOGLE_AUTH_STATE and CHROME_USER_DATA_DIR are missing", async () => {
+        process.env["DATABASE_URL"] = "postgresql://user:pass@localhost:5432/db";
+        process.env["DEEPGRAM_API_KEY"] = "dg-key-123";
+        delete process.env["GOOGLE_AUTH_STATE"];
+        delete process.env["CHROME_USER_DATA_DIR"];
+        const { parseWorkerConfig } = await Promise.resolve().then(() => __importStar(require("./index")));
+        (0, vitest_1.expect)(() => parseWorkerConfig()).toThrow();
     });
     (0, vitest_1.it)("throws when DEEPGRAM_API_KEY is missing", async () => {
         process.env["DATABASE_URL"] = "postgresql://user:pass@localhost:5432/db";

@@ -45,8 +45,11 @@ services:
       DATABASE_URL: "postgresql://meetingbot:secret@postgres:5432/meetingbot"
       DEEPGRAM_API_KEY: "${DEEPGRAM_API_KEY}"
       GOOGLE_AUTH_STATE: "${GOOGLE_AUTH_STATE}"
+      CHROME_USER_DATA_DIR: "/data/chrome-profile"
       PULSE_SINK_NAME: "virtual_sink"
       LOG_LEVEL: "debug"
+    volumes:
+      - ../../tmp/bot-chrome-profile:/data/chrome-profile
     depends_on:
       postgres:
         condition: service_healthy

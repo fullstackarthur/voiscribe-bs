@@ -5,6 +5,7 @@ import { parseApiConfig, ApiConfig } from "@meetingbot/config";
 import { ScheduleMeetingInput } from "../schemas/meeting";
 
 const logger = createLogger({});
+const tasksClient = new CloudTasksClient();
 
 export async function scheduleMeeting(
   input: ScheduleMeetingInput
@@ -35,8 +36,7 @@ async function enqueueCloudTask(
   joinAt: Date,
   config: ApiConfig
 ): Promise<void> {
-  const client = new CloudTasksClient();
-  const parent = client.queuePath(
+  const parent = tasksClient.queuePath(
     config.cloudTasksProject,
     config.cloudTasksLocation,
     config.cloudTasksQueue
@@ -55,5 +55,5 @@ async function enqueueCloudTask(
     },
   };
 
-  await client.createTask({ parent, task });
+  await tasksClient.createTask({ parent, task });
 }

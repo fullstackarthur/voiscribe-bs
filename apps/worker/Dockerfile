@@ -55,6 +55,7 @@ RUN pnpm --filter @meetingbot/worker build
 
 COPY apps/worker/start.sh /start.sh
 RUN chmod +x /start.sh
+RUN mkdir -p /data/chrome-profile
 
 ENV NODE_ENV=production
 ENV DISPLAY=:99

@@ -3,7 +3,7 @@ import { createLogger } from "@meetingbot/logger";
 import * as fs from "fs";
 
 export type JoinResult = {
-  browser: Browser;
+  browser?: Browser;
   context: BrowserContext;
   page: Page;
 };
@@ -11,19 +11,18 @@ export type JoinResult = {
 const JOIN_TIMEOUT_MS = 120_000;
 const MEETING_END_POLL_MS = 5_000;
 
+const userAgent =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
 export async function launchAndJoinMeet(
   meetingUrl: string,
   meetingId: string,
-  googleAuthStateJson: string
+  googleAuthStateJson: string,
+  chromeUserDataDir?: string
 ): Promise<JoinResult> {
   const logger = createLogger({ meetingId });
 
-  const authStatePath = `/tmp/auth-state-${meetingId}.json`;
-  fs.writeFileSync(authStatePath, googleAuthStateJson);
-
-  logger.info({ event: "BROWSER_LAUNCHING" }, "Launching Chromium");
-
-  const browser = await chromium.launch({
+  const launchOptions = {
     headless: false,
     args: [
       "--no-sandbox",
@@ -34,22 +33,45 @@ export async function launchAndJoinMeet(
       "--disable-blink-features=AutomationControlled",
       `--display=${process.env["DISPLAY"] ?? ":99"}`,
     ],
-  });
+  };
 
-  const context = await browser.newContext({
-    storageState: authStatePath,
-    permissions: ["camera", "microphone"],
-    userAgent:
-      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-  });
+  logger.info({ event: "BROWSER_LAUNCHING" }, "Launching Chromium");
 
-  fs.rmSync(authStatePath, { force: true });
+  let browser: Browser | undefined;
+  let context: BrowserContext;
+
+  if (chromeUserDataDir) {
+    logger.info(
+      { event: "USING_PERSISTENT_CHROME_PROFILE", chromeUserDataDir },
+      "Using persistent Chrome profile"
+    );
+
+    context = await chromium.launchPersistentContext(chromeUserDataDir, {
+      ...launchOptions,
+      permissions: ["camera", "microphone"],
+      userAgent,
+    });
+  } else {
+    const authStatePath = `/tmp/auth-state-${meetingId}.json`;
+    fs.writeFileSync(authStatePath, googleAuthStateJson);
+
+    browser = await chromium.launch(launchOptions);
+    context = await browser.newContext({
+      storageState: authStatePath,
+      permissions: ["camera", "microphone"],
+      userAgent,
+    });
+
+    fs.rmSync(authStatePath, { force: true });
+  }
+
+  await context.grantPermissions(["camera", "microphone"]);
 
   await context.addInitScript(() => {
     Object.defineProperty(navigator, "webdriver", { get: () => false });
   });
 
-  const page = await context.newPage();
+  const page = context.pages()[0] ?? await context.newPage();
 
   page.on("console", (msg) => {
     if (msg.type() === "error") {
@@ -68,7 +90,6 @@ export async function launchAndJoinMeet(
     "Page loaded after navigation"
   );
 
-  // If redirected to sign-in, cookies have expired
   if (
     pageTitle.toLowerCase().includes("sign in") ||
     pageUrl.includes("accounts.google.com") ||
@@ -76,7 +97,7 @@ export async function launchAndJoinMeet(
     pageText.includes("Use your Google Account")
   ) {
     throw new Error(
-      "COOKIES_EXPIRED: Google session expired — re-run the auth refresh script and upload new cookies to Secret Manager."
+      "GOOGLE_SESSION_EXPIRED: Google session expired. Re-authenticate the bot Chrome profile or refresh GOOGLE_AUTH_STATE."
     );
   }
 
@@ -147,7 +168,7 @@ async function clickJoinButton(
     }
   }
 
-  throw new Error("Could not find and click a join button — selectors exhausted");
+  throw new Error("Could not find and click a join button - selectors exhausted");
 }
 
 async function waitUntilInMeeting(
@@ -213,7 +234,7 @@ export async function cleanupBrowser(
 
   try {
     await joinResult.context.close();
-    await joinResult.browser.close();
+    await joinResult.browser?.close();
     logger.info({ event: "BROWSER_CLOSED" }, "Browser context closed");
   } catch (err) {
     logger.warn({ event: "BROWSER_CLOSE_FAILED", err }, "Failed to close browser gracefully");

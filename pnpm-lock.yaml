@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      playwright:
+        specifier: ^1.59.1
+        version: 1.59.1
     devDependencies:
       '@prisma/client':
         specifier: ^5.14.0

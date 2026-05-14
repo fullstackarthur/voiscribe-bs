@@ -38,20 +38,22 @@ export function startDeepgramTranscription(
   apiKey: string,
   audioStream: Readable,
   onChunk: (chunk: TranscriptChunkEvent) => Promise<void>,
-  getSpeakerName: (speakerIndex: number) => string = (i) => `Speaker ${i}`
+  getSpeakerName: (speakerIndex: number) => string = (i) => `Speaker ${i}`,
+  model = "nova-3",
+  language = "multi"
 ): DeepgramSession {
   const logger = createLogger({ meetingId });
   const deepgram = createClient(apiKey);
 
   const connection = deepgram.listen.live({
-    model: "nova-2",
+    model,
     encoding: "linear16",
     sample_rate: 16000,
     channels: 1,
     punctuate: true,
     interim_results: true,
     endpointing: 300,
-    language: "multi",
+    language,
     diarize: true,
   });
 
